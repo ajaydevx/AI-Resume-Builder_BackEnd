@@ -1,64 +1,82 @@
+const signInUser_Model = require("../models/userSignIn-Model");
+const User = require("../models/userSignUp-Model");
 
-const signInUser_Model = require('../models/userSignIn-Model')
-const User = require('../models/userSignUp-Model')
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: 24 * 60 * 60 * 1000,
+};
 
-exports.userSignUp = async (req, res, next) => {
+exports.userSignUp = async (req, res) => {
   try {
-    const { userName, userEmail, userPassword } = req.body;
+    const { userName, userEmail, userPassword } = req.body || {};
 
-    // Validate input
     if (!userName || !userEmail || !userPassword) {
-      return res.status(400).json({ message: 'All fields (userName, userEmail, userPassword) are required' });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Create new user
-    const user = new User({ userName, userEmail, userPassword });
+    const normalizedEmail = userEmail.trim().toLowerCase();
+    if (userPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
 
-    // Save user to database
+    const user = new User({
+      userName: userName.trim(),
+      userEmail: normalizedEmail,
+      userPassword,
+    });
+
     await user.save();
-
-    // Success response
-    return res.status(201).json({ message: 'User signed up successfully' });
+    return res.status(201).json({ message: "User signed up successfully" });
   } catch (err) {
-    console.error('Error in userSignUp:', err.message);
+    console.error("Error in userSignUp:", err.message);
 
-    // Handle duplicate key error (E11000)
-    if (err.code === 11000 && err.keyPattern.userEmail) {
-      return res.status(409).json({ message: 'Email already registered' });
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "Email already registered" });
     }
 
-    // Handle other errors (e.g., validation errors)
-    if (err.name === 'ValidationError') {
-      const messages = Object.values(err.errors).map((e) => e.message);
-      return res.status(400).json({ message: 'Validation failed', errors: messages });
+    if (err.name === "ValidationError") {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: Object.values(err.errors).map((e) => e.message),
+      });
     }
 
-    // Generic server error
-    return res.status(500).json({ message: 'Internal server error', error: err.message });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-exports.userSignIn = async (req,res,next) => {
-  const {userEmail,userPassword} = req.body
-  console.log("user SignIn")
-  const user = await signInUser_Model(userEmail, userPassword)
-  if(user === "no user found") {
-    return res.status(401).send("User not found")
-  }else if(user === "credentials are not matching"){
-    return res.status(401).send("Credentials are not matching")
+exports.userSignIn = async (req, res) => {
+  try {
+    const { userEmail, userPassword } = req.body || {};
+    if (!userEmail || !userPassword) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await signInUser_Model(userEmail.trim().toLowerCase(), userPassword);
+
+    if (user === "no user found" || user === "credentials are not matching") {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    if (user === "internal server error") {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+
+    res.cookie("token", user, cookieOptions);
+    return res.status(200).json({ message: "Signed in successfully" });
+  } catch (err) {
+    console.error("Error in userSignIn:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
   }
-res.cookie("token", user, {
-  httpOnly: true,
-  secure: true,       
-  sameSite: "none",
-  maxAge: 24 * 60 * 60 * 1000,
-});
-res.send(user)
-}
+};
 
-
-
-exports.userSignOut = (req, res, next) => {
-  res.clearCookie('token')
-  res.status(200).send('Cookie cleared and user logged out.');
+exports.userSignOut = (_req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  });
+  return res.status(200).json({ message: "Logged out successfully" });
 };
