@@ -15,7 +15,7 @@ const app = express();
 
 // ✅ Allow frontend from localhost & LAN IP
 app.use(cors({
-  origin: ["https://re-gen.netlify.app","http://192.168.107.151:5173"], 
+  origin: ["https://reimagineresume.netlify.app","http://192.168.107.151:5173"], 
   credentials: true,
 }));
 app.use((req, res, next) => {
