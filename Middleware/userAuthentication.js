@@ -1,30 +1,38 @@
-const jwt = require('jsonwebtoken')
-require('dotenv').config()
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
-const SECRET="3e5fe2b13dd2b4ecb9e2d8945a3fc1842a635b7e2398136d5151eac54aefc6f9"
+const SECRET = process.env.JWT_SECRET;
 
-exports.setUserCookie = (user) =>{
-  return jwt.sign(
-    {
-      userName: user.userName,
-      userId: user._id
-    },SECRET,  { expiresIn: '1d' })
+if (!SECRET) {
+  throw new Error("JWT_SECRET is not configured");
 }
-exports.GetUserCookie = (token) =>{
-  if(!token) return null
-  const data = jwt.verify(token,SECRET)
-  return data
-}
+
+exports.setUserCookie = (user) =>
+  jwt.sign(
+    { userName: user.userName, userId: user._id },
+    SECRET,
+    { expiresIn: "1d" }
+  );
+
+exports.GetUserCookie = (token) => {
+  if (!token) return null;
+  try {
+    return jwt.verify(token, SECRET);
+  } catch (_error) {
+    return null;
+  }
+};
 
 exports.authenticateUser = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
 
-   const token = req.cookies.token; 
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
   try {
-    const decoded = jwt.verify(token, SECRET); 
-    req.user = decoded; 
+    req.user = jwt.verify(token, SECRET);
     next();
-  } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
+  } catch (_error) {
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
 };
