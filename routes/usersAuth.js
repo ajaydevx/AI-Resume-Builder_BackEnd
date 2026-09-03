@@ -4,8 +4,8 @@ const { isUserAuthorized } = require('../Middleware/userAuthorization')
 const express = require('express')
 const userAuth = express.Router()
 
-userAuth.post('/user/sign-Up',userSignController.userSignUp)
-userAuth.post('/user/sign-In',userSignController.userSignIn)
+userAuth.post('/sign-Up',userSignController.userSignUp)
+userAuth.post('/sign-In',userSignController.userSignIn)
 userAuth.get('/auth/check',isUserAuthorized)
 userAuth.get('/auth/logout',userSignController.userSignOut)
 
